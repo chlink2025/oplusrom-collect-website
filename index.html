@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OPlus ROM Download Station</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #devices, #versions, #link { margin-bottom: 20px; }
+        .item { cursor: pointer; padding: 10px; border: 1px solid #ddd; margin: 5px 0; }
+        .item:hover { background: #f0f0f0; }
+        #search { width: 100%; padding: 10px; margin-bottom: 10px; }
+        #back { display: none; margin-bottom: 10px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>OPlus ROM 下载站</h1>
+    <input id="search" type="text" placeholder="搜索设备...">
+    <div id="devices"></div>
+    <div id="back" onclick="goBack()">返回设备列表</div>
+    <div id="versions"></div>
+    <div id="link"></div>
+
+    <script>
+        const repo = 'chlink2025/oplusrom'; // 替换为你的数据仓库名
+        const branch = 'main'; // 或你的分支
+        const baseApi = `https://api.github.com/repos/${repo}/contents/links`;
+        const baseRaw = `https://raw.githubusercontent.com/${repo}/${branch}/links`;
+
+        let currentDevice = null;
+        let allDevices = [];
+
+        // 加载设备列表
+        async function loadDevices() {
+            try {
+                const res = await fetch(`${baseApi}?ref=${branch}`);
+                const data = await res.json();
+                allDevices = data.filter(item => item.type === 'dir').map(item => item.name);
+                renderDevices(allDevices);
+            } catch (err) {
+                console.error('Error loading devices:', err);
+            }
+        }
+
+        // 渲染设备列表
+        function renderDevices(devices) {
+            const container = document.getElementById('devices');
+            container.innerHTML = '';
+            devices.forEach(device => {
+                const div = document.createElement('div');
+                div.className = 'item';
+                div.textContent = device;
+                div.onclick = () => loadVersions(device);
+                container.appendChild(div);
+            });
+        }
+
+        // 加载版本列表
+        async function loadVersions(device) {
+            currentDevice = device;
+            try {
+                const res = await fetch(`${baseApi}/${device}?ref=${branch}`);
+                const data = await res.json();
+                const versions = data.filter(item => item.name.endsWith('.txt')).map(item => item.name.replace('.txt', ''));
+                renderVersions(versions);
+                showSection('versions');
+            } catch (err) {
+                console.error('Error loading versions:', err);
+            }
+        }
+
+        // 渲染版本列表
+        function renderVersions(versions) {
+            const container = document.getElementById('versions');
+            container.innerHTML = `<h2>${currentDevice} 可用版本</h2>`;
+            versions.forEach(version => {
+                const div = document.createElement('div');
+                div.className = 'item';
+                div.textContent = version;
+                div.onclick = () => loadLink(version);
+                container.appendChild(div);
+            });
+        }
+
+        // 加载链接
+        async function loadLink(version) {
+            const txtPath = `${currentDevice}/${version}.txt`;
+            const rawUrl = `${baseRaw}/${txtPath}`;
+            try {
+                const res = await fetch(rawUrl);
+                const link = await res.text().trim(); // 第一行内容，即链接
+                let displayContent = `<h3>${version} 下载链接</h3>`;
+
+                const url = new URL(link);
+                if (url.searchParams.has('downloadcheck')) {
+                    // 用 Cloudflare Pages Functions 代理处理：添加 header 并跟随 302 重定向
+                    const proxyUrl = `/proxy?url=${encodeURIComponent(link)}`;
+                    const proxyRes = await fetch(proxyUrl);
+                    let processedLink = link; // 默认 fallback
+                    if (proxyRes.ok) {
+                        processedLink = await proxyRes.text(); // Functions 返回最终重定向后的 URL
+                    }
+                    displayContent += `<p>原始链接：${link}</p><p>处理后链接（已发送请求头 userid: oplus-ota|，经 302 重定向）：${processedLink}</p>`;
+                } else {
+                    // 不带 downloadcheck，直接显示原始链接
+                    displayContent += `<p>链接：${link}</p>`;
+                }
+
+                displayContent += `<p>下载提示：如果 403，可用 curl -H "userid: oplus-ota|" -O [链接]</p>`;
+                document.getElementById('link').innerHTML = displayContent;
+                showSection('link');
+            } catch (err) {
+                console.error('Error loading link:', err);
+                document.getElementById('link').innerHTML = '<p>加载失败</p>';
+            }
+        }
+
+        // 显示/隐藏 section（SPA 效果，不另开页）
+        function showSection(section) {
+            document.getElementById('devices').style.display = section === 'devices' ? 'block' : 'none';
+            document.getElementById('versions').style.display = section === 'versions' ? 'block' : 'none';
+            document.getElementById('link').style.display = section === 'link' ? 'block' : 'none';
+            document.getElementById('back').style.display = section !== 'devices' ? 'block' : 'none';
+            if (section === 'link') {
+                document.getElementById('versions').style.display = 'block'; // 保持版本列表可见
+            }
+        }
+
+        // 返回上一级
+        function goBack() {
+            if (document.getElementById('link').style.display === 'block') {
+                showSection('versions');
+            } else {
+                showSection('devices');
+            }
+        }
+
+        // 搜索功能
+        document.getElementById('search').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            const filtered = allDevices.filter(device => device.toLowerCase().includes(query));
+            renderDevices(filtered);
+        });
+
+        // 初始化
+        loadDevices();
+        showSection('devices');
+    </script>
+</body>
+</html>
