@@ -29,4 +29,4 @@ https://oplusromdl.pages.dev/
    - 建置命令：留空
    - 輸出目錄：留空
 4. 部署完成後，自訂域名（可選）
-5. 如果要使用解析coloros16鏈接的功能，請確保倉庫中有 `functions/proxy.js` 檔案
+5. 如果要使用重定向coloros16鏈接的功能，請確保倉庫中有 `functions/proxy.js` 檔案
