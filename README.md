@@ -8,7 +8,7 @@
 https://oplusromdl.pages.dev/
 
 ## 功能特色
-- 無任何人機
+- 無任何人机验证
 - 對coloros16的rom的鏈接，會嘗試透過 Cloudflare Functions並添加 `userid: oplus-ota|` 請求頭，獲取真實直接使用下載地
 
 ## links 資料來源
