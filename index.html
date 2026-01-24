@@ -226,13 +226,13 @@
                             <h3>原始链接</h3>
                             <pre id="raw-${version}">${link}</pre>
                             <button class="copy-btn" onclick="copyToClipboard(document.getElementById('raw-${version}').textContent, this)">复制</button>
-                            <span class="copy-tip">已复制！</span>
+                            <span class="copy-tip" style="display:none;">已複製！</span>
                         </div>
                         <div class="link-container">
                             <h3>处理后链接（已触发 302 重定向）</h3>
                             <pre id="processed-${version}">${processedLink}</pre>
                             <button class="copy-btn" onclick="copyToClipboard(document.getElementById('processed-${version}').textContent, this)">复制</button>
-                            <span class="copy-tip">已复制！</span>
+                            <span class="copy-tip" style="display:none;">已複製！</span>
                         </div>
                         <p style="color: green; margin-top: 15px;">已成功获取重定向后的下载链接</p>
                     `;
@@ -242,7 +242,7 @@
                             <h3>链接</h3>
                             <pre id="direct-${version}">${link}</pre>
                             <button class="copy-btn" onclick="copyToClipboard(document.getElementById('direct-${version}').textContent, this)">复制</button>
-                            <span class="copy-tip">已复制！</span>
+                            <span class="copy-tip" style="display:none;">已複製！</span>
                         </div>
                         <p style="color: orange; margin-top: 15px;">未检测到重定向或处理未成功，使用原始链接</p>
                     `;
