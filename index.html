@@ -131,7 +131,7 @@
                 const urlObj = new URL(link);
 
                 if (urlObj.searchParams.has('downloadCheck')) {
-                    const proxyUrl = `/proxy?url=${encodeURIComponent(link)}`;
+                    const proxyUrl = `/proxy?url=${encodeURIComponent(encodeURIComponent(link))}`;
                     const proxyRes = await fetch(proxyUrl);
                     let processedLink = link;
                     if (proxyRes.ok) {
