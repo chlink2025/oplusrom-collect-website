@@ -30,7 +30,7 @@
     <div id="link"></div>
 
     <script>
-        const repo = 'chlink2025/oplusrom';  // ← 这里替换成你的实际数据仓库名，例如 'chalj/oplus-links'
+        const repo = 'chlink2025/oplusrom';  // 固定使用原仓库
         const branch = 'main';
         const baseApi = `https://api.github.com/repos/${repo}/contents/links`;
         const baseRaw = `https://raw.githubusercontent.com/${repo}/${branch}/links`;
@@ -38,46 +38,7 @@
         let currentDevice = null;
         let currentVersion = null;
         let allDevices = [];
-        // 一鍵複製函數（支援現代瀏覽器）
-        function copyToClipboard(text, btnElement) {
-            // 嘗試使用 Clipboard API
-            navigator.clipboard.writeText(text).then(() => {
-                // 成功後顯示提示
-                const tip = btnElement.nextElementSibling;  // <span class="copy-tip">
-                if (tip) {
-                    tip.style.display = 'inline';
-                    setTimeout(() => {
-                        tip.style.display = 'none';
-                    }, 2000);  // 2秒後隱藏
-                }
-                console.log('已複製到剪貼簿:', text);
-            }).catch(err => {
-                console.error('Clipboard API 失敗:', err);
-                
-                // 後備方案：使用舊式 document.execCommand
-                const textarea = document.createElement('textarea');
-                textarea.value = text;
-                textarea.style.position = 'fixed';
-                textarea.style.opacity = '0';
-                document.body.appendChild(textarea);
-                textarea.select();
-                try {
-                    const successful = document.execCommand('copy');
-                    if (successful) {
-                        const tip = btnElement.nextElementSibling;
-                        if (tip) {
-                            tip.style.display = 'inline';
-                            setTimeout(() => tip.style.display = 'none', 2000);
-                        }
-                    } else {
-                        alert('複製失敗，請手動選取並 Ctrl+C');
-                    }
-                } catch (err2) {
-                    alert('複製失敗，請手動選取並 Ctrl+C');
-                }
-                document.body.removeChild(textarea);
-            });
-        }
+
         // 显示/隐藏 loading
         function showLoading(show) {
             document.getElementById('loading').style.display = show ? 'block' : 'none';
@@ -93,6 +54,38 @@
             document.getElementById('back').style.display = section === 'devices' ? 'none' : 'block';
         }
 
+        // 更新 URL 路徑（不重新加載頁面）
+        function updateUrl(path) {
+            history.pushState({ path }, '', path);
+        }
+
+        // 從 URL 路徑解析並加載內容
+        function handleRoute() {
+            const path = window.location.pathname.substring(1);  // 去掉開頭 /
+            const parts = path.split('/').filter(p => p);
+
+            if (parts.length === 0) {
+                // 根路徑：顯示設備列表
+                loadDevices();
+            } else if (parts.length === 1) {
+                // /設備名：顯示版本列表
+                currentDevice = decodeURIComponent(parts[0]);
+                loadVersions(currentDevice);
+            } else if (parts.length === 2) {
+                // /設備名/版本名：顯示連結
+                currentDevice = decodeURIComponent(parts[0]);
+                currentVersion = decodeURIComponent(parts[1]);
+                loadLink(currentVersion);
+            } else {
+                // 無效路徑：重定向到根
+                updateUrl('/');
+                loadDevices();
+            }
+        }
+
+        // 監聽 popstate 事件（瀏覽器後退/前進）
+        window.addEventListener('popstate', handleRoute);
+
         // 加载设备列表
         async function loadDevices() {
             showLoading(true);
@@ -105,7 +98,7 @@
                 showSection('devices');
             } catch (err) {
                 console.error(err);
-                document.getElementById('devices').innerHTML = `<p style="color:red;">${err.message}（请检查 repo 配置或网络）</p>`;
+                document.getElementById('devices').innerHTML = `<p style="color:red;">${err.message}（请检查网络或 GitHub 限速）</p>`;
             } finally {
                 showLoading(false);
             }
@@ -118,7 +111,10 @@
                 const div = document.createElement('div');
                 div.className = 'item';
                 div.textContent = device;
-                div.onclick = () => loadVersions(device);
+                div.onclick = () => {
+                    updateUrl(`/${encodeURIComponent(device)}`);
+                    loadVersions(device);
+                };
                 container.appendChild(div);
             });
         }
@@ -150,8 +146,25 @@
                 const div = document.createElement('div');
                 div.className = 'item';
                 div.textContent = version;
-                div.onclick = () => loadLink(version);
+                div.onclick = () => {
+                    updateUrl(`/${encodeURIComponent(currentDevice)}/${encodeURIComponent(version)}`);
+                    loadLink(version);
+                };
                 container.appendChild(div);
+            });
+        }
+
+        // 複製函數
+        function copyToClipboard(text, btnElement) {
+            navigator.clipboard.writeText(text).then(() => {
+                const tip = btnElement.nextElementSibling;
+                if (tip) {
+                    tip.style.display = 'inline';
+                    setTimeout(() => tip.style.display = 'none', 2000);
+                }
+            }).catch(err => {
+                console.error('複製失敗:', err);
+                alert('複製失敗，請手動複製');
             });
         }
 
@@ -160,96 +173,93 @@
             currentVersion = version;
             const txtPath = `${currentDevice}/${version}.txt`;
             const rawUrl = `${baseRaw}/${encodeURIComponent(txtPath)}`;
-            
             showLoading(true);
-            
             try {
                 const res = await fetch(rawUrl);
-                if (!res.ok) throw new Error(`連結文件加載失敗: ${res.status}`);
-                const link = (await res.text()).trim();
+                if (!res.ok) throw new Error(`链接文件加载失败: ${res.status}`);
+                const link = (await res.text()).trim(); // 第一行内容，即链接
 
                 console.log('[DEBUG] 版本:', version);
-                console.log('[DEBUG] 原始 TXT 連結:', link);
+                console.log('[DEBUG] 原始 TXT 链接:', link);
 
                 let content = `<h2>${currentDevice} - ${version}</h2>`;
-                let processedLink = link;  // 預設為原始連結
+                let processedLink = link;  // 默认 fallback
 
                 const urlObj = new URL(link);
                 const pathLower = urlObj.pathname.toLowerCase();
-                
+
                 console.log('[DEBUG] pathname:', urlObj.pathname);
-                console.log('[DEBUG] pathname (小寫):', pathLower);
+                console.log('[DEBUG] pathname (小写):', pathLower);
                 console.log('[DEBUG] 是否包含 downloadcheck:', pathLower.includes('downloadcheck'));
 
                 if (pathLower.includes('downloadcheck')) {
-                    console.log('[DEBUG] 檢測到 downloadcheck 在路徑中，進入 proxy 處理');
+                    console.log('[DEBUG] 检测到 downloadcheck 在路径中，进入 proxy 处理');
 
                     const encodedLink = btoa(link);
-                    console.log('[DEBUG] Base64 編碼後:', encodedLink);
-                    
+                    console.log('[DEBUG] Base64 编码后:', encodedLink);
+
                     const proxyUrl = `/proxy?url=${encodedLink}`;
-                    console.log('[DEBUG] 即將發送 proxy 請求:', proxyUrl);
+                    console.log('[DEBUG] 即将发送 proxy 请求:', proxyUrl);
 
                     try {
                         const proxyRes = await fetch(proxyUrl);
-                        console.log('[DEBUG] proxy 響應狀態碼:', proxyRes.status);
+                        console.log('[DEBUG] proxy 响应状态码:', proxyRes.status);
 
                         if (proxyRes.ok) {
                             const text = await proxyRes.text();
-                            console.log('[DEBUG] proxy 返回內容:', text);
+                            console.log('[DEBUG] proxy 返回内容:', text);
                             processedLink = text;
                         } else {
-                            console.log('[DEBUG] proxy 非 200 狀態，使用原始連結');
+                            console.log('[DEBUG] proxy 非 200 状态，使用原始链接');
                         }
                     } catch (fetchErr) {
-                        console.error('[DEBUG] fetch proxy 發生錯誤:', fetchErr);
+                        console.error('[DEBUG] fetch proxy 发生错误:', fetchErr);
                     }
                 } else {
-                    console.log('[DEBUG] 未檢測到 downloadcheck 路徑，跳過 proxy 請求');
+                    console.log('[DEBUG] 未检测到 downloadcheck 路径，跳过 proxy 请求');
                 }
 
-                // 根據 processedLink 是否變化來決定顯示方式
+                // 根据 processedLink 是否变化来决定显示方式
                 if (processedLink !== link) {
                     content += `
                         <div class="link-container">
-                            <h3>原始連結</h3>
+                            <h3>原始链接</h3>
                             <pre id="raw-${version}">${link}</pre>
-                            <button class="copy-btn" onclick="copyToClipboard(document.getElementById('raw-${version}').textContent, this)">複製</button>
-                            <span class="copy-tip">已複製！</span>
+                            <button class="copy-btn" onclick="copyToClipboard(document.getElementById('raw-${version}').textContent, this)">复制</button>
+                            <span class="copy-tip">已复制！</span>
                         </div>
                         <div class="link-container">
-                            <h3>處理後連結（已觸發 302 重定向）</h3>
+                            <h3>处理后链接（已触发 302 重定向）</h3>
                             <pre id="processed-${version}">${processedLink}</pre>
-                            <button class="copy-btn" onclick="copyToClipboard(document.getElementById('processed-${version}').textContent, this)">複製</button>
-                            <span class="copy-tip">已複製！</span>
+                            <button class="copy-btn" onclick="copyToClipboard(document.getElementById('processed-${version}').textContent, this)">复制</button>
+                            <span class="copy-tip">已复制！</span>
                         </div>
-                        <p style="color: green; margin-top: 15px;">已成功獲取重定向後的下載連結</p>
+                        <p style="color: green; margin-top: 15px;">已成功获取重定向后的下载链接</p>
                     `;
                 } else {
                     content += `
                         <div class="link-container">
-                            <h3>連結</h3>
+                            <h3>链接</h3>
                             <pre id="direct-${version}">${link}</pre>
-                            <button class="copy-btn" onclick="copyToClipboard(document.getElementById('direct-${version}').textContent, this)">複製</button>
-                            <span class="copy-tip">已複製！</span>
+                            <button class="copy-btn" onclick="copyToClipboard(document.getElementById('direct-${version}').textContent, this)">复制</button>
+                            <span class="copy-tip">已复制！</span>
                         </div>
-                        <p style="color: orange; margin-top: 15px;">未檢測到重定向或處理未成功，使用原始連結</p>
+                        <p style="color: orange; margin-top: 15px;">未检测到重定向或处理未成功，使用原始链接</p>
                     `;
                 }
 
                 content += `
                     <p style="color: #666; margin-top: 20px;">
-                        下載提示：複製連結後，可用以下命令下載（推薦 curl 或 IDM）：<br>
-                        <code>curl -H "userid: oplus-ota|" -O [連結]</code>
+                        下载提示：复制链接后，可用以下命令下载（推荐 curl 或 IDM）：<br>
+                        <code>curl -H "userid: oplus-ota|" -O [链接]</code>
                     </p>
                 `;
 
                 document.getElementById('link').innerHTML = content;
                 showSection('link');
-                
             } catch (err) {
-                console.error('[DEBUG] loadLink 整體錯誤:', err);
-                document.getElementById('link').innerHTML = `<p style="color:red;">加載失敗: ${err.message}</p>`;
+                console.error('[DEBUG] loadLink 整体错误:', err);
+                document.getElementById('link').innerHTML = `<p style="color:red;">加载失败: ${err.message}</p>`;
             } finally {
                 showLoading(false);
             }
@@ -258,8 +268,10 @@
         // 返回上一级
         document.getElementById('back').onclick = function() {
             if (document.getElementById('link').style.display === 'block') {
+                updateUrl(`/${encodeURIComponent(currentDevice)}`);
                 showSection('versions');
             } else if (document.getElementById('versions').style.display === 'block') {
+                updateUrl('/');
                 showSection('devices');
             }
         };
@@ -275,8 +287,8 @@
             renderDevices(filtered);
         });
 
-        // 启动
-        loadDevices();
+        // 初始化：根據當前 URL 加載
+        handleRoute();
     </script>
 </body>
 </html>
