@@ -121,94 +121,96 @@
             currentVersion = version;
             const txtPath = `${currentDevice}/${version}.txt`;
             const rawUrl = `${baseRaw}/${encodeURIComponent(txtPath)}`;
+            
             showLoading(true);
+            
             try {
                 const res = await fetch(rawUrl);
-                if (!res.ok) throw new Error(`链接文件加载失败: ${res.status}`);
+                if (!res.ok) throw new Error(`連結文件加載失敗: ${res.status}`);
                 const link = (await res.text()).trim();
-
-                let content = `<h2>${currentDevice} - ${version}</h2>`;
 
                 console.log('[DEBUG] 版本:', version);
                 console.log('[DEBUG] 原始 TXT 連結:', link);
 
-                const urlObj = new URL(link);
-                const paramsKeys = [...urlObj.searchParams.keys()];
-                console.log('[DEBUG] 所有參數名:', paramsKeys);
-                console.log('[DEBUG] 是否包含 downloadcheck (忽略大小寫):', 
-                            paramsKeys.some(k => k.toLowerCase() === 'downloadcheck'));
+                let content = `<h2>${currentDevice} - ${version}</h2>`;
+                let processedLink = link;  // 預設為原始連結
 
-                if (paramsKeys.some(k => k.toLowerCase() === 'downloadcheck')) {
+                const urlObj = new URL(link);
+                const pathLower = urlObj.pathname.toLowerCase();
+                
+                console.log('[DEBUG] pathname:', urlObj.pathname);
+                console.log('[DEBUG] pathname (小寫):', pathLower);
+                console.log('[DEBUG] 是否包含 downloadcheck:', pathLower.includes('downloadcheck'));
+
+                if (pathLower.includes('downloadcheck')) {
+                    console.log('[DEBUG] 檢測到 downloadcheck 在路徑中，進入 proxy 處理');
+
                     const encodedLink = btoa(link);
-                    console.log('[DEBUG] Base64 後:', encodedLink);
+                    console.log('[DEBUG] Base64 編碼後:', encodedLink);
+                    
                     const proxyUrl = `/proxy?url=${encodedLink}`;
-                    console.log('[DEBUG] 即將 fetch proxy:', proxyUrl);
+                    console.log('[DEBUG] 即將發送 proxy 請求:', proxyUrl);
 
                     try {
                         const proxyRes = await fetch(proxyUrl);
-                        console.log('[DEBUG] proxy 狀態:', proxyRes.status);
+                        console.log('[DEBUG] proxy 響應狀態碼:', proxyRes.status);
+
                         if (proxyRes.ok) {
-                            processedLink = await proxyRes.text();
-                            console.log('[DEBUG] proxy 返回:', processedLink);
+                            const text = await proxyRes.text();
+                            console.log('[DEBUG] proxy 返回內容:', text);
+                            processedLink = text;
+                        } else {
+                            console.log('[DEBUG] proxy 非 200 狀態，使用原始連結');
                         }
                     } catch (fetchErr) {
-                        console.error('[DEBUG] fetch proxy 錯誤:', fetchErr);
+                        console.error('[DEBUG] fetch proxy 發生錯誤:', fetchErr);
                     }
                 } else {
-                    console.log('[DEBUG] 未檢測到 downloadcheck 參數，跳過 proxy');
+                    console.log('[DEBUG] 未檢測到 downloadcheck 路徑，跳過 proxy 請求');
                 }
- //               const urlObj = new URL(link);
 
-                if (urlObj.searchParams.has('downloadCheck')) {
-                    // 使用 Base64 编码完整链接，避免任何参数截断问题
-                    const encodedLink = btoa(link);  // Base64 编码
-                    const proxyUrl = `/proxy?url=${encodedLink}`;
-
-                    const proxyRes = await fetch(proxyUrl);
-                    let processedLink = link;  // 默认 fallback 为原始链接
-
-                    if (proxyRes.ok) {
-                        processedLink = await proxyRes.text();  // 拿到后端返回的链接字符串
-                    }
-
+                // 根據 processedLink 是否變化來決定顯示方式
+                if (processedLink !== link) {
                     content += `
                         <div class="link-container">
-                            <h3>原始链接</h3>
+                            <h3>原始連結</h3>
                             <pre id="raw-${version}">${link}</pre>
-                            <button class="copy-btn" onclick="copyToClipboard(document.getElementById('raw-${version}').textContent, this)">复制</button>
-                            <span class="copy-tip">已复制！</span>
+                            <button class="copy-btn" onclick="copyToClipboard(document.getElementById('raw-${version}').textContent, this)">複製</button>
+                            <span class="copy-tip">已複製！</span>
                         </div>
                         <div class="link-container">
-                            <h3>处理后链接（已发送 userid header）</h3>
+                            <h3>處理後連結（已觸發 302 重定向）</h3>
                             <pre id="processed-${version}">${processedLink}</pre>
-                            <button class="copy-btn" onclick="copyToClipboard(document.getElementById('processed-${version}').textContent, this)">复制</button>
-                            <span class="copy-tip">已复制！</span>
-                            ${processedLink === link 
-                                ? '<p style="color: orange;">（未触发 302 重定向，使用原始链接）</p>' 
-                                : '<p style="color: green;">（触发 302 重定向，已获取最终下载链接）</p>'}
+                            <button class="copy-btn" onclick="copyToClipboard(document.getElementById('processed-${version}').textContent, this)">複製</button>
+                            <span class="copy-tip">已複製！</span>
                         </div>
-                        <p style="margin-top: 15px; color: #666;">
-                            复制处理后链接后，可用 curl -O [链接] 或 IDM/浏览器直接下载。如果仍 403，请尝试手动加 header: userid: oplus-ota|
-                        </p>
+                        <p style="color: green; margin-top: 15px;">已成功獲取重定向後的下載連結</p>
                     `;
                 } else {
-                    // 非 downloadCheck 部分保持原样
                     content += `
                         <div class="link-container">
-                            <h3>直接链接</h3>
+                            <h3>連結</h3>
                             <pre id="direct-${version}">${link}</pre>
-                            <button class="copy-btn" onclick="copyToClipboard(document.getElementById('direct-${version}').textContent, this)">复制</button>
-                            <span class="copy-tip">已复制！</span>
+                            <button class="copy-btn" onclick="copyToClipboard(document.getElementById('direct-${version}').textContent, this)">複製</button>
+                            <span class="copy-tip">已複製！</span>
                         </div>
+                        <p style="color: orange; margin-top: 15px;">未檢測到重定向或處理未成功，使用原始連結</p>
                     `;
-                } 
-                content += `<p style="color:#666;">下载提示：如果直链 403，可用 curl -H "userid: oplus-ota|" -O [上面任一链接]</p>`;
+                }
+
+                content += `
+                    <p style="color: #666; margin-top: 20px;">
+                        下載提示：複製連結後，可用以下命令下載（推薦 curl 或 IDM）：<br>
+                        <code>curl -H "userid: oplus-ota|" -O [連結]</code>
+                    </p>
+                `;
 
                 document.getElementById('link').innerHTML = content;
                 showSection('link');
+                
             } catch (err) {
-                console.error(err);
-                document.getElementById('link').innerHTML = `<p style="color:red;">${err.message}</p>`;
+                console.error('[DEBUG] loadLink 整體錯誤:', err);
+                document.getElementById('link').innerHTML = `<p style="color:red;">加載失敗: ${err.message}</p>`;
             } finally {
                 showLoading(false);
             }
