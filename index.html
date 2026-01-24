@@ -1,55 +1,77 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OPlus ROM Download Station</title>
+    <title>OPlus ROM 下载站</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
+        body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }
+        h1, h2, h3 { color: #333; }
+        #search { width: 100%; padding: 10px; margin-bottom: 15px; box-sizing: border-box; }
+        .item { cursor: pointer; padding: 12px; border: 1px solid #ddd; margin: 8px 0; border-radius: 4px; background: #f9f9f9; }
+        .item:hover { background: #e8f0fe; }
+        #back { display: none; margin: 15px 0; padding: 10px; background: #4285f4; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        #back:hover { background: #3367d6; }
+        #loading { display: none; color: #666; font-style: italic; margin: 10px 0; }
         #devices, #versions, #link { margin-bottom: 20px; }
-        .item { cursor: pointer; padding: 10px; border: 1px solid #ddd; margin: 5px 0; }
-        .item:hover { background: #f0f0f0; }
-        #search { width: 100%; padding: 10px; margin-bottom: 10px; }
-        #back { display: none; margin-bottom: 10px; cursor: pointer; }
-        #loading { display: none; color: gray; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; word-break: break-all; }
     </style>
 </head>
 <body>
     <h1>OPlus ROM 下载站</h1>
-    <input id="search" type="text" placeholder="搜索设备...">
-    <div id="devices"></div>
-    <div id="back" onclick="goBack()">返回设备列表</div>
-    <div id="versions"></div>
+    <input id="search" type="text" placeholder="搜索设备（支持中文/英文）...">
+
+    <button id="back">返回上一级</button>
+
     <div id="loading">加载中...</div>
+
+    <div id="devices"></div>
+    <div id="versions"></div>
     <div id="link"></div>
 
     <script>
-        const repo = 'chlink2025/oplusrom'; // 替换为你的数据仓库名！！！
-        const branch = 'main'; // 或你的分支
+        const repo = '你的用户名/my-oplus-links';  // ← 这里替换成你的实际数据仓库名，例如 'chalj/oplus-links'
+        const branch = 'main';
         const baseApi = `https://api.github.com/repos/${repo}/contents/links`;
         const baseRaw = `https://raw.githubusercontent.com/${repo}/${branch}/links`;
 
         let currentDevice = null;
+        let currentVersion = null;
         let allDevices = [];
+
+        // 显示/隐藏 loading
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        // 统一显示 section（替换式：只显示当前层级）
+        function showSection(section) {
+            document.getElementById('devices').style.display = 'none';
+            document.getElementById('versions').style.display = 'none';
+            document.getElementById('link').style.display = 'none';
+
+            document.getElementById(section).style.display = 'block';
+            document.getElementById('back').style.display = section === 'devices' ? 'none' : 'block';
+        }
 
         // 加载设备列表
         async function loadDevices() {
             showLoading(true);
             try {
                 const res = await fetch(`${baseApi}?ref=${branch}`);
-                if (!res.ok) throw new Error(`API error: ${res.status}`);
+                if (!res.ok) throw new Error(`设备列表加载失败: ${res.status}`);
                 const data = await res.json();
                 allDevices = data.filter(item => item.type === 'dir').map(item => item.name);
                 renderDevices(allDevices);
+                showSection('devices');
             } catch (err) {
-                console.error('Error loading devices:', err);
-                document.getElementById('devices').innerHTML = '<p>加载设备失败，请检查控制台</p>';
+                console.error(err);
+                document.getElementById('devices').innerHTML = `<p style="color:red;">${err.message}（请检查 repo 配置或网络）</p>`;
             } finally {
                 showLoading(false);
             }
         }
 
-        // 渲染设备列表
         function renderDevices(devices) {
             const container = document.getElementById('devices');
             container.innerHTML = '';
@@ -67,21 +89,21 @@
             currentDevice = device;
             showLoading(true);
             try {
-                const res = await fetch(`${baseApi}/${device}?ref=${branch}`);
-                if (!res.ok) throw new Error(`API error: ${res.status}`);
+                const res = await fetch(`${baseApi}/${encodeURIComponent(device)}?ref=${branch}`);
+                if (!res.ok) throw new Error(`版本列表加载失败: ${res.status}`);
                 const data = await res.json();
-                const versions = data.filter(item => item.name.endsWith('.txt')).map(item => item.name.replace('.txt', ''));
+                const versions = data.filter(item => item.name.endsWith('.txt'))
+                                     .map(item => item.name.replace('.txt', ''));
                 renderVersions(versions);
                 showSection('versions');
             } catch (err) {
-                console.error('Error loading versions:', err);
-                document.getElementById('versions').innerHTML = '<p>加载版本失败，请检查控制台</p>';
+                console.error(err);
+                document.getElementById('versions').innerHTML = `<p style="color:red;">${err.message}</p>`;
             } finally {
                 showLoading(false);
             }
         }
 
-        // 渲染版本列表
         function renderVersions(versions) {
             const container = document.getElementById('versions');
             container.innerHTML = `<h2>${currentDevice} 可用版本</h2>`;
@@ -94,76 +116,73 @@
             });
         }
 
-        // 加载链接
+        // 加载并显示链接（替换版本列表）
         async function loadLink(version) {
+            currentVersion = version;
             const txtPath = `${currentDevice}/${version}.txt`;
-            const rawUrl = `${baseRaw}/${txtPath}`;
+            const rawUrl = `${baseRaw}/${encodeURIComponent(txtPath)}`;
             showLoading(true);
             try {
                 const res = await fetch(rawUrl);
-                if (!res.ok) throw new Error(`Raw fetch error: ${res.status}`);
-                const link = await res.text().trim(); // 第一行内容，即链接
-                let displayContent = `<h3>${version} 下载链接</h3>`;
+                if (!res.ok) throw new Error(`链接文件加载失败: ${res.status}`);
+                const link = (await res.text()).trim();
 
-                const url = new URL(link);
-                if (url.searchParams.has('downloadcheck')) {
+                let content = `<h2>${currentDevice} - ${version}</h2>`;
+                const urlObj = new URL(link);
+
+                if (urlObj.searchParams.has('downloadcheck')) {
                     const proxyUrl = `/proxy?url=${encodeURIComponent(link)}`;
                     const proxyRes = await fetch(proxyUrl);
-                    if (!proxyRes.ok) throw new Error(`Proxy error: ${proxyRes.status}`);
-                    let processedLink = link; // 默认 fallback
-                    processedLink = await proxyRes.text(); // Functions 返回最终重定向后的 URL
-                    displayContent += `<p>原始链接：${link}</p><p>处理后链接（已发送请求头 userid: oplus-ota|，经 302 重定向）：${processedLink}</p>`;
+                    let processedLink = link;
+                    if (proxyRes.ok) {
+                        processedLink = await proxyRes.text();
+                    }
+                    content += `
+                        <h3>下载链接</h3>
+                        <p><strong>原始链接：</strong><br><pre>${link}</pre></p>
+                        <p><strong>处理后链接（加 userid: oplus-ota| 头，经 302 重定向）：</strong><br><pre>${processedLink}</pre></p>
+                    `;
                 } else {
-                    displayContent += `<p>链接：${link}</p>`;
+                    content += `
+                        <h3>下载链接</h3>
+                        <p><strong>链接：</strong><br><pre>${link}</pre></p>
+                    `;
                 }
 
-                displayContent += `<p>下载提示：如果 403，可用 curl -H "userid: oplus-ota|" -O [链接]</p>`;
-                document.getElementById('link').innerHTML = displayContent;
+                content += `<p style="color:#666;">下载提示：如果直链 403，可用 curl -H "userid: oplus-ota|" -O [上面任一链接]</p>`;
+
+                document.getElementById('link').innerHTML = content;
                 showSection('link');
             } catch (err) {
-                console.error('Error loading link:', err);
-                document.getElementById('link').innerHTML = `<p>加载失败: ${err.message}</p>`;
+                console.error(err);
+                document.getElementById('link').innerHTML = `<p style="color:red;">${err.message}</p>`;
             } finally {
                 showLoading(false);
             }
         }
 
-        // 显示/隐藏 loading
-        function showLoading(show) {
-            document.getElementById('loading').style.display = show ? 'block' : 'none';
-        }
-
-        // 显示/隐藏 section（SPA 效果，不另开页）
-        function showSection(section) {
-            document.getElementById('devices').style.display = section === 'devices' ? 'block' : 'none';
-            document.getElementById('versions').style.display = section === 'versions' ? 'block' : 'none';
-            document.getElementById('link').style.display = section === 'link' ? 'block' : 'none';
-            document.getElementById('back').style.display = section !== 'devices' ? 'block' : 'none';
-            if (section === 'link') {
-                document.getElementById('versions').style.display = 'block'; // 保持版本列表可见
-            }
-        }
-
         // 返回上一级
-        function goBack() {
+        document.getElementById('back').onclick = function() {
             if (document.getElementById('link').style.display === 'block') {
                 showSection('versions');
-                document.getElementById('link').innerHTML = ''; // 清空链接显示
-            } else {
+            } else if (document.getElementById('versions').style.display === 'block') {
                 showSection('devices');
             }
-        }
+        };
 
-        // 搜索功能
+        // 搜索
         document.getElementById('search').addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase();
-            const filtered = allDevices.filter(device => device.toLowerCase().includes(query));
+            const query = e.target.value.toLowerCase().trim();
+            if (!query) {
+                renderDevices(allDevices);
+                return;
+            }
+            const filtered = allDevices.filter(d => d.toLowerCase().includes(query));
             renderDevices(filtered);
         });
 
-        // 初始化
+        // 启动
         loadDevices();
-        showSection('devices');
     </script>
 </body>
 </html>
