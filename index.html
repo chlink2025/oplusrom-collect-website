@@ -131,24 +131,48 @@
                 const urlObj = new URL(link);
 
                 if (urlObj.searchParams.has('downloadCheck')) {
-                    const proxyUrl = `/proxy?url=${encodeURIComponent(encodeURIComponent(link))}`;
+                    // 使用 Base64 编码完整链接，避免任何参数截断问题
+                    const encodedLink = btoa(link);  // Base64 编码
+                    const proxyUrl = `/proxy?url=${encodedLink}`;
+
                     const proxyRes = await fetch(proxyUrl);
-                    let processedLink = link;
+                    let processedLink = link;  // 默认 fallback 为原始链接
+
                     if (proxyRes.ok) {
-                        processedLink = await proxyRes.text();
+                        processedLink = await proxyRes.text();  // 拿到后端返回的链接字符串
                     }
+
                     content += `
-                        <h3>下载链接</h3>
-                        <p><strong>原始链接：</strong><br><pre>${link}</pre></p>
-                        <p><strong>处理后链接（加 userid: oplus-ota| 头，经 302 重定向）：</strong><br><pre>${processedLink}</pre></p>
+                        <div class="link-container">
+                            <h3>原始链接</h3>
+                            <pre id="raw-${version}">${link}</pre>
+                            <button class="copy-btn" onclick="copyToClipboard(document.getElementById('raw-${version}').textContent, this)">复制</button>
+                            <span class="copy-tip">已复制！</span>
+                        </div>
+                        <div class="link-container">
+                            <h3>处理后链接（已发送 userid header）</h3>
+                            <pre id="processed-${version}">${processedLink}</pre>
+                            <button class="copy-btn" onclick="copyToClipboard(document.getElementById('processed-${version}').textContent, this)">复制</button>
+                            <span class="copy-tip">已复制！</span>
+                            ${processedLink === link 
+                                ? '<p style="color: orange;">（未触发 302 重定向，使用原始链接）</p>' 
+                                : '<p style="color: green;">（触发 302 重定向，已获取最终下载链接）</p>'}
+                        </div>
+                        <p style="margin-top: 15px; color: #666;">
+                            复制处理后链接后，可用 curl -O [链接] 或 IDM/浏览器直接下载。如果仍 403，请尝试手动加 header: userid: oplus-ota|
+                        </p>
                     `;
                 } else {
+                    // 非 downloadCheck 部分保持原样
                     content += `
-                        <h3>下载链接</h3>
-                        <p><strong>链接：</strong><br><pre>${link}</pre></p>
+                        <div class="link-container">
+                            <h3>直接链接</h3>
+                            <pre id="direct-${version}">${link}</pre>
+                            <button class="copy-btn" onclick="copyToClipboard(document.getElementById('direct-${version}').textContent, this)">复制</button>
+                            <span class="copy-tip">已复制！</span>
+                        </div>
                     `;
-                }
-
+                } 
                 content += `<p style="color:#666;">下载提示：如果直链 403，可用 curl -H "userid: oplus-ota|" -O [上面任一链接]</p>`;
 
                 document.getElementById('link').innerHTML = content;
