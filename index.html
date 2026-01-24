@@ -130,7 +130,7 @@
                 let content = `<h2>${currentDevice} - ${version}</h2>`;
                 const urlObj = new URL(link);
 
-                if (urlObj.searchParams.has('downloadcheck')) {
+                if (urlObj.searchParams.has('downloadCheck')) {
                     const proxyUrl = `/proxy?url=${encodeURIComponent(link)}`;
                     const proxyRes = await fetch(proxyUrl);
                     let processedLink = link;
