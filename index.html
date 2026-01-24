@@ -38,7 +38,46 @@
         let currentDevice = null;
         let currentVersion = null;
         let allDevices = [];
-
+        // 一鍵複製函數（支援現代瀏覽器）
+        function copyToClipboard(text, btnElement) {
+            // 嘗試使用 Clipboard API
+            navigator.clipboard.writeText(text).then(() => {
+                // 成功後顯示提示
+                const tip = btnElement.nextElementSibling;  // <span class="copy-tip">
+                if (tip) {
+                    tip.style.display = 'inline';
+                    setTimeout(() => {
+                        tip.style.display = 'none';
+                    }, 2000);  // 2秒後隱藏
+                }
+                console.log('已複製到剪貼簿:', text);
+            }).catch(err => {
+                console.error('Clipboard API 失敗:', err);
+                
+                // 後備方案：使用舊式 document.execCommand
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        const tip = btnElement.nextElementSibling;
+                        if (tip) {
+                            tip.style.display = 'inline';
+                            setTimeout(() => tip.style.display = 'none', 2000);
+                        }
+                    } else {
+                        alert('複製失敗，請手動選取並 Ctrl+C');
+                    }
+                } catch (err2) {
+                    alert('複製失敗，請手動選取並 Ctrl+C');
+                }
+                document.body.removeChild(textarea);
+            });
+        }
         // 显示/隐藏 loading
         function showLoading(show) {
             document.getElementById('loading').style.display = show ? 'block' : 'none';
