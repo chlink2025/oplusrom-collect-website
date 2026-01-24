@@ -229,7 +229,7 @@
                             <span class="copy-tip" style="display:none;">已複製！</span>
                         </div>
                         <div class="link-container">
-                            <h3>处理后链接（已触发 302 重定向）</h3>
+                            <h3>直鏈(可直接下載)</h3>
                             <pre id="processed-${version}">${processedLink}</pre>
                             <button class="copy-btn" onclick="copyToClipboard(document.getElementById('processed-${version}').textContent, this)">复制</button>
                             <span class="copy-tip" style="display:none;">已複製！</span>
@@ -248,12 +248,6 @@
                     `;
                 }
 
-                content += `
-                    <p style="color: #666; margin-top: 20px;">
-                        下载提示：复制链接后，可用以下命令下载（推荐 curl 或 IDM）：<br>
-                        <code>curl -H "userid: oplus-ota|" -O [链接]</code>
-                    </p>
-                `;
 
                 document.getElementById('link').innerHTML = content;
                 showSection('link');
