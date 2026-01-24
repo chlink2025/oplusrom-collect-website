@@ -11,6 +11,7 @@
         .item:hover { background: #f0f0f0; }
         #search { width: 100%; padding: 10px; margin-bottom: 10px; }
         #back { display: none; margin-bottom: 10px; cursor: pointer; }
+        #loading { display: none; color: gray; }
     </style>
 </head>
 <body>
@@ -19,10 +20,11 @@
     <div id="devices"></div>
     <div id="back" onclick="goBack()">返回设备列表</div>
     <div id="versions"></div>
+    <div id="loading">加载中...</div>
     <div id="link"></div>
 
     <script>
-        const repo = 'chlink2025/oplusrom'; // 替换为你的数据仓库名
+        const repo = '你的用户名/my-oplus-links'; // 替换为你的数据仓库名！！！
         const branch = 'main'; // 或你的分支
         const baseApi = `https://api.github.com/repos/${repo}/contents/links`;
         const baseRaw = `https://raw.githubusercontent.com/${repo}/${branch}/links`;
@@ -32,13 +34,18 @@
 
         // 加载设备列表
         async function loadDevices() {
+            showLoading(true);
             try {
                 const res = await fetch(`${baseApi}?ref=${branch}`);
+                if (!res.ok) throw new Error(`API error: ${res.status}`);
                 const data = await res.json();
                 allDevices = data.filter(item => item.type === 'dir').map(item => item.name);
                 renderDevices(allDevices);
             } catch (err) {
                 console.error('Error loading devices:', err);
+                document.getElementById('devices').innerHTML = '<p>加载设备失败，请检查控制台</p>';
+            } finally {
+                showLoading(false);
             }
         }
 
@@ -58,14 +65,19 @@
         // 加载版本列表
         async function loadVersions(device) {
             currentDevice = device;
+            showLoading(true);
             try {
                 const res = await fetch(`${baseApi}/${device}?ref=${branch}`);
+                if (!res.ok) throw new Error(`API error: ${res.status}`);
                 const data = await res.json();
                 const versions = data.filter(item => item.name.endsWith('.txt')).map(item => item.name.replace('.txt', ''));
                 renderVersions(versions);
                 showSection('versions');
             } catch (err) {
                 console.error('Error loading versions:', err);
+                document.getElementById('versions').innerHTML = '<p>加载版本失败，请检查控制台</p>';
+            } finally {
+                showLoading(false);
             }
         }
 
@@ -86,23 +98,22 @@
         async function loadLink(version) {
             const txtPath = `${currentDevice}/${version}.txt`;
             const rawUrl = `${baseRaw}/${txtPath}`;
+            showLoading(true);
             try {
                 const res = await fetch(rawUrl);
+                if (!res.ok) throw new Error(`Raw fetch error: ${res.status}`);
                 const link = await res.text().trim(); // 第一行内容，即链接
                 let displayContent = `<h3>${version} 下载链接</h3>`;
 
                 const url = new URL(link);
                 if (url.searchParams.has('downloadcheck')) {
-                    // 用 Cloudflare Pages Functions 代理处理：添加 header 并跟随 302 重定向
                     const proxyUrl = `/proxy?url=${encodeURIComponent(link)}`;
                     const proxyRes = await fetch(proxyUrl);
+                    if (!proxyRes.ok) throw new Error(`Proxy error: ${proxyRes.status}`);
                     let processedLink = link; // 默认 fallback
-                    if (proxyRes.ok) {
-                        processedLink = await proxyRes.text(); // Functions 返回最终重定向后的 URL
-                    }
+                    processedLink = await proxyRes.text(); // Functions 返回最终重定向后的 URL
                     displayContent += `<p>原始链接：${link}</p><p>处理后链接（已发送请求头 userid: oplus-ota|，经 302 重定向）：${processedLink}</p>`;
                 } else {
-                    // 不带 downloadcheck，直接显示原始链接
                     displayContent += `<p>链接：${link}</p>`;
                 }
 
@@ -111,8 +122,15 @@
                 showSection('link');
             } catch (err) {
                 console.error('Error loading link:', err);
-                document.getElementById('link').innerHTML = '<p>加载失败</p>';
+                document.getElementById('link').innerHTML = `<p>加载失败: ${err.message}</p>`;
+            } finally {
+                showLoading(false);
             }
+        }
+
+        // 显示/隐藏 loading
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
         }
 
         // 显示/隐藏 section（SPA 效果，不另开页）
@@ -130,6 +148,7 @@
         function goBack() {
             if (document.getElementById('link').style.display === 'block') {
                 showSection('versions');
+                document.getElementById('link').innerHTML = ''; // 清空链接显示
             } else {
                 showSection('devices');
             }
