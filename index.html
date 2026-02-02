@@ -15,10 +15,41 @@
         #loading { display: none; color: #666; font-style: italic; margin: 10px 0; }
         #devices, #versions, #link { margin-bottom: 20px; }
         pre { background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; word-break: break-all; }
+        
+        /* 资料来源说明样式 */
+        #source-info {
+            font-size: 14px;
+            color: #555;
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-left: 4px solid #4285f4;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        #source-info a {
+            color: #4285f4;
+            text-decoration: none;
+        }
+        #source-info a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
     <h1>OPlus ROM 下载站</h1>
+
+    <!-- 资料来源说明 -->
+    <div id="source-info">
+        <strong>资料来源说明：</strong> 
+        本站所有 ROM 版本与下载链接均来自公开的官方 OTA 服务器，由 
+        <a href="https://github.com/chlink2025/oplusrom" target="_blank" rel="noopener noreferrer">
+            https://github.com/chlink2025/oplusrom
+        </a> 
+        仓库的 <code>links/</code> 文件夹收集与整理。<br>
+        所有链接为官方直链，本站仅提供索引与辅助访问（部分需特定 header 才能下载）。<br>
+        如认为好用请给上述仓库 star，如需原始数据或更新，请参考上述 GitHub 仓库。
+    </div>
+
     <input id="search" type="text" placeholder="搜索设备（支持中文/英文）...">
 
     <button id="back">返回上一级</button>
@@ -30,7 +61,7 @@
     <div id="link"></div>
 
     <script>
-        const repo = 'chlink2025/oplusrom';  // 固定使用原仓库
+        const repo = 'chlink2025/oplusrom';
         const branch = 'main';
         const baseApi = `https://api.github.com/repos/${repo}/contents/links`;
         const baseRaw = `https://raw.githubusercontent.com/${repo}/${branch}/links`;
@@ -39,12 +70,10 @@
         let currentVersion = null;
         let allDevices = [];
 
-        // 显示/隐藏 loading
         function showLoading(show) {
             document.getElementById('loading').style.display = show ? 'block' : 'none';
         }
 
-        // 统一显示 section（替换式：只显示当前层级）
         function showSection(section) {
             document.getElementById('devices').style.display = 'none';
             document.getElementById('versions').style.display = 'none';
@@ -54,39 +83,31 @@
             document.getElementById('back').style.display = section === 'devices' ? 'none' : 'block';
         }
 
-        // 更新 URL 路徑（不重新加載頁面）
         function updateUrl(path) {
             history.pushState({ path }, '', path);
         }
 
-        // 從 URL 路徑解析並加載內容
         function handleRoute() {
-            const path = window.location.pathname.substring(1);  // 去掉開頭 /
+            const path = window.location.pathname.substring(1);
             const parts = path.split('/').filter(p => p);
 
             if (parts.length === 0) {
-                // 根路徑：顯示設備列表
                 loadDevices();
             } else if (parts.length === 1) {
-                // /設備名：顯示版本列表
                 currentDevice = decodeURIComponent(parts[0]);
-                loadVersions(currentDevice);
+                loadVersions(currentDevice);  // 确保进入 /设备名 时加载版本列表
             } else if (parts.length === 2) {
-                // /設備名/版本名：顯示連結
                 currentDevice = decodeURIComponent(parts[0]);
                 currentVersion = decodeURIComponent(parts[1]);
                 loadLink(currentVersion);
             } else {
-                // 無效路徑：重定向到根
                 updateUrl('/');
                 loadDevices();
             }
         }
 
-        // 監聽 popstate 事件（瀏覽器後退/前進）
         window.addEventListener('popstate', handleRoute);
 
-        // 加载设备列表
         async function loadDevices() {
             showLoading(true);
             try {
@@ -119,7 +140,6 @@
             });
         }
 
-        // 加载版本列表
         async function loadVersions(device) {
             currentDevice = device;
             showLoading(true);
@@ -154,7 +174,6 @@
             });
         }
 
-        // 複製函數
         function copyToClipboard(text, btnElement) {
             navigator.clipboard.writeText(text).then(() => {
                 const tip = btnElement.nextElementSibling;
@@ -163,12 +182,11 @@
                     setTimeout(() => tip.style.display = 'none', 2000);
                 }
             }).catch(err => {
-                console.error('複製失敗:', err);
-                alert('複製失敗，請手動複製');
+                console.error('复制失败:', err);
+                alert('复制失败，请手动复制');
             });
         }
 
-        // 加载并显示链接（替换版本列表）
         async function loadLink(version) {
             currentVersion = version;
             const txtPath = `${currentDevice}/${version}.txt`;
@@ -177,13 +195,13 @@
             try {
                 const res = await fetch(rawUrl);
                 if (!res.ok) throw new Error(`链接文件加载失败: ${res.status}`);
-                const link = (await res.text()).trim(); // 第一行内容，即链接
+                const link = (await res.text()).trim();
 
                 console.log('[DEBUG] 版本:', version);
                 console.log('[DEBUG] 原始 TXT 链接:', link);
 
                 let content = `<h2>${currentDevice} - ${version}</h2>`;
-                let processedLink = link;  // 默认 fallback
+                let processedLink = link;
 
                 const urlObj = new URL(link);
                 const pathLower = urlObj.pathname.toLowerCase();
@@ -219,20 +237,19 @@
                     console.log('[DEBUG] 未检测到 downloadcheck 路径，跳过 proxy 请求');
                 }
 
-                // 根据 processedLink 是否变化来决定显示方式
                 if (processedLink !== link) {
                     content += `
                         <div class="link-container">
                             <h3>原始链接</h3>
                             <pre id="raw-${version}">${link}</pre>
                             <button class="copy-btn" onclick="copyToClipboard(document.getElementById('raw-${version}').textContent, this)">复制</button>
-                            <span class="copy-tip" style="display:none;">已複製！</span>
+                            <span class="copy-tip" style="display:none;">已复制！</span>
                         </div>
                         <div class="link-container">
-                            <h3>直鏈(可直接下載)</h3>
+                            <h3>直链(可直接下载)</h3>
                             <pre id="processed-${version}">${processedLink}</pre>
                             <button class="copy-btn" onclick="copyToClipboard(document.getElementById('processed-${version}').textContent, this)">复制</button>
-                            <span class="copy-tip" style="display:none;">已複製！</span>
+                            <span class="copy-tip" style="display:none;">已复制！</span>
                         </div>
                         <p style="color: green; margin-top: 15px;">已成功获取重定向后的下载链接</p>
                     `;
@@ -242,12 +259,11 @@
                             <h3>链接</h3>
                             <pre id="direct-${version}">${link}</pre>
                             <button class="copy-btn" onclick="copyToClipboard(document.getElementById('direct-${version}').textContent, this)">复制</button>
-                            <span class="copy-tip" style="display:none;">已複製！</span>
+                            <span class="copy-tip" style="display:none;">已复制！</span>
                         </div>
                         <p style="color: orange; margin-top: 15px;">未检测到重定向或处理未成功，使用原始链接</p>
                     `;
                 }
-
 
                 document.getElementById('link').innerHTML = content;
                 showSection('link');
@@ -259,18 +275,19 @@
             }
         }
 
-        // 返回上一级
+        // 返回上一级 - 关键修复：返回到版本列表时重新加载内容
         document.getElementById('back').onclick = function() {
             if (document.getElementById('link').style.display === 'block') {
+                // 从链接详情返回版本列表 → 重新加载版本列表内容
                 updateUrl(`/${encodeURIComponent(currentDevice)}`);
-                showSection('versions');
+                loadVersions(currentDevice);  // 强制重新调用，确保 #versions 有内容
             } else if (document.getElementById('versions').style.display === 'block') {
+                // 从版本列表返回设备列表
                 updateUrl('/');
                 showSection('devices');
             }
         };
 
-        // 搜索
         document.getElementById('search').addEventListener('input', (e) => {
             const query = e.target.value.toLowerCase().trim();
             if (!query) {
@@ -281,7 +298,7 @@
             renderDevices(filtered);
         });
 
-        // 初始化：根據當前 URL 加載
+        // 初始化：根据当前 URL 加载
         handleRoute();
     </script>
 </body>
