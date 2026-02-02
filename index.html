@@ -95,7 +95,7 @@
                 loadDevices();
             } else if (parts.length === 1) {
                 currentDevice = decodeURIComponent(parts[0]);
-                loadVersions(currentDevice);  // 确保进入 /设备名 时加载版本列表
+                loadVersions(currentDevice);
             } else if (parts.length === 2) {
                 currentDevice = decodeURIComponent(parts[0]);
                 currentVersion = decodeURIComponent(parts[1]);
@@ -197,44 +197,25 @@
                 if (!res.ok) throw new Error(`链接文件加载失败: ${res.status}`);
                 const link = (await res.text()).trim();
 
-                console.log('[DEBUG] 版本:', version);
-                console.log('[DEBUG] 原始 TXT 链接:', link);
-
                 let content = `<h2>${currentDevice} - ${version}</h2>`;
                 let processedLink = link;
 
                 const urlObj = new URL(link);
                 const pathLower = urlObj.pathname.toLowerCase();
 
-                console.log('[DEBUG] pathname:', urlObj.pathname);
-                console.log('[DEBUG] pathname (小写):', pathLower);
-                console.log('[DEBUG] 是否包含 downloadcheck:', pathLower.includes('downloadcheck'));
-
                 if (pathLower.includes('downloadcheck')) {
-                    console.log('[DEBUG] 检测到 downloadcheck 在路径中，进入 proxy 处理');
-
                     const encodedLink = btoa(link);
-                    console.log('[DEBUG] Base64 编码后:', encodedLink);
-
                     const proxyUrl = `/proxy?url=${encodedLink}`;
-                    console.log('[DEBUG] 即将发送 proxy 请求:', proxyUrl);
 
                     try {
                         const proxyRes = await fetch(proxyUrl);
-                        console.log('[DEBUG] proxy 响应状态码:', proxyRes.status);
-
                         if (proxyRes.ok) {
                             const text = await proxyRes.text();
-                            console.log('[DEBUG] proxy 返回内容:', text);
                             processedLink = text;
-                        } else {
-                            console.log('[DEBUG] proxy 非 200 状态，使用原始链接');
                         }
                     } catch (fetchErr) {
                         console.error('[DEBUG] fetch proxy 发生错误:', fetchErr);
                     }
-                } else {
-                    console.log('[DEBUG] 未检测到 downloadcheck 路径，跳过 proxy 请求');
                 }
 
                 if (processedLink !== link) {
@@ -275,16 +256,16 @@
             }
         }
 
-        // 返回上一级 - 关键修复：返回到版本列表时重新加载内容
+        // 返回上一级 - 修复关键：所有返回层级都强制重新加载对应内容
         document.getElementById('back').onclick = function() {
             if (document.getElementById('link').style.display === 'block') {
-                // 从链接详情返回版本列表 → 重新加载版本列表内容
+                // 从链接详情返回版本列表 → 重新加载版本列表
                 updateUrl(`/${encodeURIComponent(currentDevice)}`);
-                loadVersions(currentDevice);  // 强制重新调用，确保 #versions 有内容
+                loadVersions(currentDevice);
             } else if (document.getElementById('versions').style.display === 'block') {
-                // 从版本列表返回设备列表
+                // 从版本列表返回设备列表 → 重新加载设备列表
                 updateUrl('/');
-                showSection('devices');
+                loadDevices();  // 关键修复：强制重新调用 loadDevices()
             }
         };
 
@@ -298,7 +279,6 @@
             renderDevices(filtered);
         });
 
-        // 初始化：根据当前 URL 加载
         handleRoute();
     </script>
 </body>
